@@ -6,9 +6,6 @@ __pycache__/
 .venv/
 venv/
 
-# 本地环境变量（包含 API Key，绝不可提交）
-.env
-
 # 编辑器 / IDE
 .idea/
 .vscode/

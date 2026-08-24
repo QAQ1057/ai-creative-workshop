@@ -3,7 +3,6 @@ import os
 import unittest
 from unittest.mock import patch
 
-# 先切换到项目根目录，确保能 import app
 import sys
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
@@ -13,8 +12,6 @@ from app import app, extract_image_url
 
 
 class MockResponse:
-    """用于模拟 requests.post 返回对象的轻量包装。"""
-
     def __init__(self, status_code, json_data=None, text=""):
         self.status_code = status_code
         self._json = json_data
@@ -27,17 +24,11 @@ class MockResponse:
 
 
 class SmokeTests(unittest.TestCase):
-    """后端接口冒烟测试集合。"""
-
     def setUp(self):
-        # 每次测试都创建一个新的测试客户端，避免状态污染
         self.client = app.test_client()
-        # 清空密钥相关环境变量：本机 .env 中的真实 Key 会被 load_dotenv 注入，
-        # 测试必须从「干净状态」出发，需要 Key 的用例自行显式设置
         self._clear_env()
 
     def tearDown(self):
-        # 清理环境变量，避免影响后续测试
         self._clear_env()
 
     @staticmethod
@@ -121,8 +112,6 @@ class SmokeTests(unittest.TestCase):
 
     @patch("app.requests.post")
     def test_generate_doubao_payload(self, mock_post):
-        """默认 provider 为豆包，转发请求体应包含 model / response_format / watermark，
-        且不应携带豆包不支持的 n 参数。"""
         os.environ["IMAGE_API_KEY"] = "fake-key"
         mock_post.return_value = MockResponse(
             200, {"data": [{"url": "https://example.com/image.png"}]}
@@ -136,13 +125,11 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(payload["response_format"], "url")
         self.assertFalse(payload["watermark"])
         self.assertNotIn("n", payload)
-        # 上游端点应为火山方舟
         url = mock_post.call_args.args[0]
         self.assertIn("ark.cn-beijing.volces.com", url)
 
     @patch("app.requests.post")
     def test_generate_ark_api_key_alias(self, mock_post):
-        """使用火山方舟官方命名 ARK_API_KEY 时也应能通过密钥检查。"""
         os.environ["ARK_API_KEY"] = "fake-ark-key"
         mock_post.return_value = MockResponse(
             200, {"data": [{"url": "https://example.com/image.png"}]}
@@ -155,7 +142,6 @@ class SmokeTests(unittest.TestCase):
 
     @patch("app.requests.post")
     def test_generate_model_not_open(self, mock_post):
-        """上游返回 ModelNotOpen（豆包模型未开通）时应给出可操作的中文提示。"""
         os.environ["IMAGE_API_KEY"] = "fake-key"
         mock_post.return_value = MockResponse(
             404,
@@ -203,7 +189,6 @@ class SmokeTests(unittest.TestCase):
 
     @patch("app.requests.post")
     def test_generate_rate_limit(self, mock_post):
-        """上游返回 429 时，应提示请求过于频繁或额度不足。"""
         os.environ["IMAGE_API_KEY"] = "fake-key"
         mock_post.return_value = MockResponse(429)
 
@@ -214,7 +199,6 @@ class SmokeTests(unittest.TestCase):
 
     @patch("app.requests.post")
     def test_generate_server_error(self, mock_post):
-        """上游返回 500 时，应提示图像服务繁忙。"""
         os.environ["IMAGE_API_KEY"] = "fake-key"
         mock_post.return_value = MockResponse(500)
 
@@ -224,23 +208,18 @@ class SmokeTests(unittest.TestCase):
         self.assertIn("繁忙", data["error"]["message"])
 
     def test_extract_image_url_various_formats(self):
-        """验证多种上游响应结构都能正确提取图片地址。"""
-        # OpenAI URL 风格
         self.assertEqual(
             extract_image_url({"data": [{"url": "https://a.com/1.png"}]}),
             "https://a.com/1.png",
         )
-        # 简化数组风格
         self.assertEqual(
             extract_image_url({"images": ["https://a.com/2.png"]}),
             "https://a.com/2.png",
         )
-        # 扁平字段
         self.assertEqual(
             extract_image_url({"image_url": "https://a.com/3.png"}),
             "https://a.com/3.png",
         )
-        # 无法识别时返回 None
         self.assertIsNone(extract_image_url({"unexpected": "value"}))
 
 

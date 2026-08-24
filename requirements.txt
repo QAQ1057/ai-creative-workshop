@@ -1,0 +1,9 @@
+# AI Creative Workshop - Python dependencies
+# Install: pip install -r requirements.txt
+# Or uv:   uv pip install -r requirements.txt
+
+flask>=3.0.0                        # Web framework
+flask-cors>=4.0.0                   # CORS support for local dev
+requests>=2.31.0                    # HTTP client to call DeepSeek API
+python-dotenv>=1.0.0                # Load .env environment variables for local dev
+gunicorn>=21.2.0; sys_platform!="win32"   # Production WSGI server (non-Windows)

@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0e1a" />
+
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="AI 创意工坊" />
+  <meta name="description" content="AI 创意工坊 —— 输入文字描述，一键生成惊艳图像" />
+
+  <title>AI 创意工坊</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+
+  <style>
+    :root {
+      /* 主题色板 */
+      --bg-deep: #070a14;          /* 页面最深底色 */
+      --bg-card: rgba(17, 24, 43, 0.72);  /* 卡片半透明深蓝 */
+      --text-primary: #e8ecf8;     /* 主文字（近白） */
+      --text-secondary: #8b93ab;   /* 次级文字（灰蓝） */
+      --grad-start: #22d3ee;       /* 渐变起点：青色 */
+      --grad-mid: #6366f1;         /* 渐变中间：靛蓝 */
+      --grad-end: #a855f7;         /* 渐变终点：紫色 */
+      --grad-pink: #ec4899;        /* 点缀：粉色 */
+      --danger: #f87171;           /* 错误提示红 */
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans",
+                   "Microsoft YaHei", "Segoe UI", sans-serif;
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      /* 两层背景叠加：径向渐变光晕 + 细网格，营造科技感 */
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.28), transparent),
+        radial-gradient(ellipse 60% 40% at 90% 110%, rgba(168, 85, 247, 0.16), transparent);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      /* 移动端沉浸式：上下 padding 适配刘海屏 */
+      padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 24px);
+      overflow-x: hidden;
+    }
+
+    /* 桌面端居中限宽，模拟手机壳效果；移动端全宽 */
+    .app-shell {
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* ============================================================
+       顶部标题区
+       ============================================================ */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 4px 4px;
+    }
+
+    /* 渐变发光 Logo 徽标 */
+    .logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 13px;
+      background: linear-gradient(135deg, var(--grad-start), var(--grad-mid) 55%, var(--grad-end));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+      box-shadow: 0 6px 24px rgba(99, 102, 241, 0.45);
+      flex-shrink: 0;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, var(--grad-start), var(--grad-mid), var(--grad-end));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .header p {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .input-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      /* 玻璃拟态：背景模糊增强层次 */
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .input-card label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+
+    /* 提示词输入框：多行，聚焦时出现渐变描边 */
+    #prompt {
+      width: 100%;
+      min-height: 96px;
+      max-height: 200px;
+      resize: vertical;
+      background: rgba(10, 14, 26, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    #prompt::placeholder { color: #55607a; }
+
+    #prompt:focus {
+      border-color: rgba(34, 211, 238, 0.6);
+      box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
+    }
+
+    /* 快捷提示词 chips，点击填充输入框 */
+    .suggestions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      overflow-x: auto;
+      scrollbar-width: none;      /* Firefox 隐藏滚动条 */
+      -ms-overflow-style: none;
+    }
+    .suggestions::-webkit-scrollbar { display: none; }
+
+    .chip {
+      flex-shrink: 0;
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .chip:active { transform: scale(0.95); background: rgba(99, 102, 241, 0.25); }
+
+    /* ============================================================
+       生成按钮：渐变亮色 + 加载态
+       ============================================================ */
+    .generate-btn {
+      width: 100%;
+      margin-top: 14px;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 15px 0;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: #fff;
+      cursor: pointer;
+      /* 渐变背景 + 内发光 + 外投影，科技感拉满 */
+      background: linear-gradient(135deg, var(--grad-start), var(--grad-mid) 50%, var(--grad-end));
+      box-shadow: 0 6px 24px rgba(99, 102, 241, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+      position: relative;
+    }
+    .generate-btn:active { transform: scale(0.98); }
+    .generate-btn:disabled {
+      opacity: 0.75;
+      cursor: not-allowed;
+      /* 加载中关闭按压动效，防止视觉抖动 */
+      transform: none;
+    }
+
+    /* 加载中的旋转光圈 */
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: -3px;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ============================================================
+       状态提示：错误 / 空态
+       ============================================================ */
+    .status-box {
+      display: none;
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      font-size: 13px;
+      line-height: 1.5;
+      border: 1px solid;
+    }
+    .status-box.error {
+      display: block;
+      color: #fecaca;
+      background: rgba(248, 113, 113, 0.12);
+      border-color: rgba(248, 113, 113, 0.35);
+    }
+
+    /* ============================================================
+       结果展示区
+       ============================================================ */
+    .result-card {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .result-card.show { display: flex; }
+
+    /* 图片容器：比例固定为 1:1，避免生成期间布局跳动 */
+    .image-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #result-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #result-img.loaded { opacity: 1; }
+
+    /* 图片加载占位动画 */
+    .image-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+    .image-placeholder .pulse {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, var(--grad-start), var(--grad-mid), var(--grad-end), var(--grad-start));
+      animation: spin 1.2s linear infinite;
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+    }
+
+    /* 操作按钮行：下载 + 重新生成 */
+    .action-row { display: flex; gap: 10px; }
+
+    .action-btn {
+      flex: 1;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-primary);
+      border-radius: var(--radius-md);
+      padding: 12px 0;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .action-btn:active { transform: scale(0.97); background: rgba(255, 255, 255, 0.1); }
+    .action-btn.primary {
+      border: none;
+      background: linear-gradient(135deg, var(--grad-mid), var(--grad-end));
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
+    }
+
+    /* ============================================================
+       页脚
+       ============================================================ */
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      color: #4b5470;
+      padding: 6px 0 2px;
+      letter-spacing: 0.5px;
+    }
+
+    /* 小屏适配：高度较小时压缩间距 */
+    @media (max-height: 700px) {
+      .app-shell { gap: 12px; }
+      #prompt { min-height: 76px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-shell">
+    <!-- ============ 顶部标题 ============ -->
+    <header class="header">
+      <div class="logo">AI</div>
+      <div>
+        <h1>AI 创意工坊</h1>
+        <p>输入描述 · 一键生成 · 惊艳图像</p>
+      </div>
+    </header>
+
+    <!-- ============ 输入区 ============ -->
+    <section class="input-card">
+      <label for="prompt">✨ 描述你想要的画面</label>
+      <textarea
+        id="prompt"
+        maxlength="2000"
+        placeholder="例如：一只在赛博都市中奔跑的机械猫，霓虹灯光倒映在雨后的街道上，赛博朋克风格，高清"
+      ></textarea>
+
+      <!-- 快捷提示词 -->
+      <div class="suggestions" id="suggestions">
+        <span class="chip" data-text="赛博朋克都市夜景，霓虹灯，雨夜，电影感">赛博朋克</span>
+        <span class="chip" data-text="水墨山水画，云雾缭绕，留白意境，中国传统美学">水墨山水</span>
+        <span class="chip" data-text="未来太空站内部，宇航员眺望地球，科幻电影质感">太空站</span>
+        <span class="chip" data-text="可爱猫咪头像，柔和光线，治愈系插画风格">猫咪头像</span>
+        <span class="chip" data-text="3D 渲染的透明水晶球，内含迷你森林，极简背景">水晶球</span>
+      </div>
+
+      <!-- 生成按钮（加载中自动禁用防重复点击） -->
+      <button id="generate-btn" class="generate-btn">生成图片</button>
+
+      <!-- 错误提示框（默认隐藏） -->
+      <div id="status-box" class="status-box" role="alert"></div>
+    </section>
+
+    <!-- ============ 结果展示区 ============ -->
+    <section id="result-card" class="result-card">
+      <div class="image-wrapper">
+        <!-- 加载占位：图片 URL 尚未就绪时显示旋转光环 -->
+        <div id="image-placeholder" class="image-placeholder">
+          <div class="pulse"></div>
+          <span>图像渲染中…</span>
+        </div>
+        <img id="result-img" alt="AI 生成的图像" />
+      </div>
+
+      <div class="action-row">
+        <button id="download-btn" class="action-btn">⬇ 保存图片</button>
+        <button id="regenerate-btn" class="action-btn primary">🔄 重新生成</button>
+      </div>
+    </section>
+
+    <footer class="footer">AI 创意工坊 · 由 火山 图像引擎驱动</footer>
+  </div>
+
+  <script>
+    /* ============================================================
+       AI 创意工坊 - 前端交互逻辑
+       安全说明：本文件不包含任何 API Key。
+       所有对外的密钥请求都由后端（Flask）代理完成。
+       ============================================================ */
+    (function () {
+      "use strict";
+
+      // ---------------- DOM 元素引用 ----------------
+      var promptInput   = document.getElementById("prompt");
+      var generateBtn   = document.getElementById("generate-btn");
+      var statusBox     = document.getElementById("status-box");
+      var resultCard    = document.getElementById("result-card");
+      var resultImg     = document.getElementById("result-img");
+      var imgPlaceholder= document.getElementById("image-placeholder");
+      var downloadBtn   = document.getElementById("download-btn");
+      var regenerateBtn = document.getElementById("regenerate-btn");
+
+      // 当前成功生成的图片地址（用于下载与重新生成）
+      var currentImageUrl = null;
+      // 最近一次成功使用的提示词（重新生成时复用）
+      var lastPrompt = "";
+
+      // ---------------- 工具函数 ----------------
+
+      /**
+       * 显示错误信息到状态框
+       * @param {string} message 中文错误文案
+       */
+      function showError(message) {
+        statusBox.textContent = message;
+        statusBox.className = "status-box error"; // 切换为 error 样式并显示
+      }
+
+      /** 隐藏状态框 */
+      function hideStatus() {
+        statusBox.className = "status-box";
+      }
+
+      /**
+       * 切换按钮加载态：防止重复点击
+       * @param {boolean} loading true 进入加载态（禁用按钮 + 旋转光圈）
+       */
+      function setLoading(loading) {
+        generateBtn.disabled = loading;
+        generateBtn.innerHTML = loading
+          ? '<span class="spinner"></span>生成中…'
+          : "生成图片";
+      }
+
+      /**
+       * 根据后端返回的错误码生成用户可读的中文提示
+       * @param {number} status HTTP 状态码
+       * @param {string} serverMessage 后端返回的错误信息（优先使用）
+       */
+      function friendlyError(status, serverMessage) {
+        // 后端已给出明确的中文错误信息时优先展示
+        if (serverMessage) return serverMessage;
+
+        // 兜底映射：前端对后端错误码的中文翻译
+        var map = {
+          400: "描述内容不合法，请检查后重试",
+          401: "API Key 无效或已过期，请联系管理员",
+          429: "请求过于频繁或额度不足，请稍后再试",
+          502: "图像服务暂时不可用，请稍后重试",
+          504: "图像生成超时，请稍后重试",
+        };
+        return map[status] || "生成失败，请稍后重试";
+      }
+
+      // ---------------- 核心：调用生成接口 ----------------
+
+      /**
+       * 提交生成请求
+       * @param {string} promptText 用户输入的提示词
+       * @returns {Promise<void>}
+       */
+      async function generate(promptText) {
+        // 进入加载态：禁用按钮，防止并发重复提交
+        setLoading(true);
+        hideStatus();
+        // 重置上一张图片的展示状态
+        resultCard.classList.remove("show");
+        resultImg.classList.remove("loaded");
+        currentImageUrl = null;
+
+        try {
+          var resp = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: promptText }),
+          });
+
+          var data;
+          try {
+            data = await resp.json(); // 尝试解析 JSON 响应
+          } catch (e) {
+            data = null;
+          }
+
+          if (!resp.ok) {
+            // 后端返回了业务错误：优先用服务端的中文提示
+            var msg = data && data.error && data.error.message;
+            throw { status: resp.status, message: friendlyError(resp.status, msg) };
+          }
+
+          // 成功：拿到图片地址，交给展示函数
+          var imageUrl = data && data.data && data.data.image_url;
+          if (!imageUrl) {
+            throw { status: 502, message: "图像服务未返回有效图片数据" };
+          }
+
+          await displayImage(imageUrl);
+          lastPrompt = promptText;
+        } catch (err) {
+          // 区分两类失败：
+          // 1. fetch 层异常（网络不可达 / 后端未启动 / 浏览器拦截）
+          // 2. 业务层抛出的 { status, message }
+          if (err && err.status && err.message) {
+            showError(err.message);
+          } else {
+            showError("网络连接失败，请检查网络或稍后重试");
+          }
+        } finally {
+          // 无论成功失败都要退出加载态
+          setLoading(false);
+        }
+      }
+
+      /**
+       * 预加载并展示生成的图片
+       * @param {string} url 图片地址（http URL 或 data URL）
+       * @returns {Promise<void>} 图片加载完成时 resolve；加载失败 reject
+       */
+      function displayImage(url) {
+        return new Promise(function (resolve, reject) {
+          // 用临时 Image 对象预加载，确保拿到完整图片再展示，
+          // 避免 <img> 出现裂图闪烁
+          var probe = new Image();
+          probe.onload = function () {
+            resultImg.src = url;
+            // 等真实 DOM 图片解码后淡入
+            resultImg.onload = function () {
+              imgPlaceholder.style.display = "none";
+              resultImg.classList.add("loaded");
+              resultCard.classList.add("show");
+              currentImageUrl = url;
+              resolve();
+            };
+          };
+          probe.onerror = function () {
+            reject({ status: 502, message: "图片加载失败，请重新生成" });
+          };
+          probe.src = url;
+        });
+      }
+
+      // ---------------- 保存图片到本地 ----------------
+
+      /**
+       * 下载当前生成的图片
+       * 原理：先 fetch 图片为 Blob，再通过临时 <a> 触发浏览器下载，
+       * 兼容 iOS Safari 与 Android Chrome。
+       */
+      async function downloadImage() {
+        if (!currentImageUrl) return;
+
+        try {
+          var blobResp = await fetch(currentImageUrl);
+          if (!blobResp.ok) throw new Error("fetch failed");
+          var blob = await blobResp.blob();
+
+          // 构造对象 URL 并触发下载
+          var objectUrl = URL.createObjectURL(blob);
+          var a = document.createElement("a");
+          a.href = objectUrl;
+          // 文件名带时间戳，避免重名覆盖
+          var ts = new Date().toISOString().replace(/[:.]/g, "-");
+          a.download = "AI-Creative-Workshop-" + ts + ".png";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(objectUrl);
+        } catch (e) {
+          // 跨域图片可能无法 fetch，此时提示用户长按图片保存
+          showError("自动保存失败，请长按图片手动保存");
+        }
+      }
+
+      // ---------------- 事件绑定 ----------------
+
+      /** 生成按钮点击：校验输入并提交 */
+      generateBtn.addEventListener("click", function () {
+        var text = promptInput.value.trim();
+        if (!text) {
+          showError("请先输入你想生成的画面描述");
+          promptInput.focus();
+          return;
+        }
+        generate(text);
+      });
+
+      /** 重新生成：复用上一次成功的提示词 */
+      regenerateBtn.addEventListener("click", function () {
+        if (lastPrompt) {
+          promptInput.value = lastPrompt;
+          generate(lastPrompt);
+        }
+      });
+
+      /** 下载按钮 */
+      downloadBtn.addEventListener("click", downloadImage);
+
+      /** 快捷提示词 chips：点击填充输入框 */
+      document.getElementById("suggestions").addEventListener("click", function (e) {
+        var chip = e.target.closest(".chip");
+        if (!chip) return;
+        promptInput.value = chip.getAttribute("data-text");
+        hideStatus();
+        promptInput.focus();
+      });
+
+      // ---------------- PWA：注册 Service Worker ----------------
+
+      /** 注册 Service Worker（支持 HTTPS 或 localhost 环境） */
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("sw.js").catch(function (err) {
+            // 注册失败不影响主功能，仅静默记录
+            console.warn("Service Worker 注册失败:", err);
+          });
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
